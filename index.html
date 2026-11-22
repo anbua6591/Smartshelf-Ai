@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SmartShelf AI – Intelligent Inventory Optimization</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="loader"><div class="spin"></div><p>Loading SmartShelf AI…</p></div>
+<aside id="sidebar">
+  <div class="brand"><i class="fa-solid fa-boxes-stacked"></i> SmartShelf <b>AI</b></div>
+  <nav>
+    <button data-page="dashboard"><i class="fa-solid fa-chart-pie"></i> Dashboard</button>
+    <button data-page="inventory"><i class="fa-solid fa-box"></i> Inventory</button>
+    <button data-page="forecast"><i class="fa-solid fa-wand-magic-sparkles"></i> Demand Forecast</button>
+    <button data-page="restock"><i class="fa-solid fa-truck-ramp-box"></i> Smart Restock</button>
+    <button data-page="alerts"><i class="fa-solid fa-bell"></i> Alerts <span id="alertCount" class="pill">0</span></button>
+    <button data-page="analytics"><i class="fa-solid fa-chart-line"></i> Analytics</button>
+  </nav>
+  <button id="resetBtn" class="reset"><i class="fa-solid fa-rotate-left"></i> Reset sample data</button>
+</aside>
+<main>
+  <header class="top">
+    <button id="menu" class="icon-btn" aria-label="Menu"><i class="fa-solid fa-bars"></i></button>
+    <h1 id="title">Dashboard</h1>
+    <button class="btn" id="addTop"><i class="fa-solid fa-plus"></i> Add product</button>
+  </header>
+
+  <section id="page-dashboard" class="page">
+    <div class="cards" id="cards"></div>
+    <div class="grid2">
+      <div class="card"><h3>Units sold, last 14 days</h3><div class="chart"><canvas id="cDash"></canvas></div></div>
+      <div class="card"><h3>Needs attention</h3><div id="dashAlerts"></div></div>
+    </div>
+  </section>
+
+  <section id="page-inventory" class="page">
+    <div class="card">
+      <div class="toolbar">
+        <input id="search" type="search" placeholder="Search name or ID…">
+        <select id="fCat"></select>
+        <select id="fStatus"><option value="">All statuses</option><option value="ok">In stock</option><option value="low">Low stock</option><option value="out">Out of stock</option></select>
+        <label class="btn ghost" for="csvFile"><i class="fa-solid fa-file-import"></i> Import CSV</label>
+        <input id="csvFile" type="file" accept=".csv,text/csv" hidden>
+        <button class="btn ghost" id="exportInv"><i class="fa-solid fa-file-export"></i> Export CSV</button>
+      </div>
+      <div class="scroll"><table><thead><tr><th>ID</th><th>Product</th><th>Category</th><th>Stock</th><th>Min</th><th>Price</th><th>Sales/day (7d)</th><th>Expiry</th><th>Status</th><th>Actions</th></tr></thead><tbody id="invBody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section id="page-forecast" class="page">
+    <div class="card">
+      <div class="toolbar"><label>Product <select id="fcProduct"></select></label></div>
+      <div class="chart"><canvas id="cForecast"></canvas></div>
+      <p id="fcExplain" class="explain"></p>
+    </div>
+    <div class="card"><h3>All products: next 7 days</h3>
+      <div class="scroll"><table><thead><tr><th>Product</th><th>Last 7d avg</th><th>Trend/day</th><th>Predicted 7d demand</th><th>Speed</th></tr></thead><tbody id="fcBody"></tbody></table></div>
+      <p class="note">Method: the 7-day average sets the demand level, and a least-squares trend line over the last 28 days of real sales projects it forward. No random values.</p>
+    </div>
+  </section>
+
+  <section id="page-restock" class="page">
+    <div class="card">
+      <div class="toolbar">
+        <label>Supplier lead time (days) <input id="lead" type="number" min="1" max="60"></label>
+        <label>Cover target (days) <input id="cover" type="number" min="1" max="120"></label>
+        <button class="btn ghost" id="exportRestock"><i class="fa-solid fa-file-export"></i> Export reorder list</button>
+      </div>
+      <div class="scroll"><table><thead><tr><th>Product</th><th>Stock</th><th>Days left</th><th>Reorder point</th><th>Order qty</th><th>Urgency</th><th>Calculation</th></tr></thead><tbody id="rsBody"></tbody></table></div>
+      <p class="note">Reorder point = forecast demand × lead time + safety stock (1.65 × demand std-dev × √lead time). Order qty = target stock (demand × (lead + cover) + safety) − stock on hand.</p>
+    </div>
+  </section>
+
+  <section id="page-alerts" class="page"><div id="alertList"></div></section>
+
+  <section id="page-analytics" class="page">
+    <div class="grid2">
+      <div class="card"><h3>Daily sales (units, last 14 days)</h3><div class="chart"><canvas id="cDaily"></canvas></div></div>
+      <div class="card"><h3>Weekly revenue (last 12 weeks)</h3><div class="chart"><canvas id="cWeekly"></canvas></div></div>
+      <div class="card"><h3>Monthly revenue (30-day blocks)</h3><div class="chart"><canvas id="cMonthly"></canvas></div></div>
+      <div class="card"><h3>Inventory value by category</h3><div class="chart"><canvas id="cDist"></canvas></div></div>
+      <div class="card wide"><h3>Total demand: actual vs predicted</h3><div class="chart"><canvas id="cTotalFc"></canvas></div></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="dlg">
+  <form id="pform" novalidate>
+    <h2 id="dlgTitle">Add product</h2>
+    <div id="formErr" class="formerr" hidden></div>
+    <div class="fgrid">
+      <label>Product ID <input name="id" placeholder="Auto (e.g. P018)"></label>
+      <label>Product name * <input name="name"></label>
+      <label>Category * <input name="category" list="cats"></label><datalist id="cats"></datalist>
+      <label>Current stock * <input name="stock" type="number" min="0" step="1"></label>
+      <label>Minimum stock level * <input name="min" type="number" min="0" step="1"></label>
+      <label>Price ($) * <input name="price" type="number" min="0" step="0.01"></label>
+      <label>Daily sales (avg units) * <input name="daily" type="number" min="0" step="0.1"></label>
+      <label>Expiry date <input name="expiry" type="date"></label>
+    </div>
+    <p class="note" id="dailyNote"></p>
+    <div class="actions"><button type="button" class="btn ghost" id="cancel">Cancel</button><button class="btn" type="submit">Save product</button></div>
+  </form>
+</dialog>
+<div id="toasts"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
